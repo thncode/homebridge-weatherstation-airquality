@@ -1,0 +1,58 @@
+{
+  "_from": "homebridge-weatherstation-airquality",
+  "_id": "homebridge-weatherstation-airquality@1.0.0",
+  "_inBundle": false,
+  "_integrity": "sha512-g8tkvadqXOgwM1nR5wWHDXwPtXdV+yU4JU9cW3IWyjdKa2rwSSdx8YTk9nGpR8fxo//a/5faMrXi+GkWRJFPyg==",
+  "_location": "/homebridge-weatherstation-airquality",
+  "_phantomChildren": {},
+  "_requested": {
+    "type": "tag",
+    "registry": true,
+    "raw": "homebridge-weatherstation-airquality",
+    "name": "homebridge-weatherstation-airquality",
+    "escapedName": "homebridge-weatherstation-airquality",
+    "rawSpec": "",
+    "saveSpec": null,
+    "fetchSpec": "latest"
+  },
+  "_requiredBy": [
+    "#USER"
+  ],
+  "_resolved": "https://registry.npmjs.org/homebridge-weatherstation-airquality/-/homebridge-weatherstation-airquality-1.0.0.tgz",
+  "_shasum": "80508de5594309e30c3670186a068e6cd4434c6f",
+  "_spec": "homebridge-weatherstation-airquality",
+  "_where": "/home/pi/homebridge-weatherstation-airquality",
+  "author": {
+    "name": "Thomas Nemec"
+  },
+  "bugs": {
+    "url": "https://github.com/thncode/homebridge-weatherstation-airquality/issues"
+  },
+  "bundleDependencies": false,
+  "dependencies": {
+    "fakegato-history": "^0.5.3"
+  },
+  "deprecated": false,
+  "description": "This is a homebridge plugin for local weather stations",
+  "engines": {
+    "homebridge": ">=0.2.0",
+    "node": ">=0.12.0"
+  },
+  "homepage": "https://github.com/thncode/homebridge-weatherstation-airquality#readme",
+  "keywords": [
+    "homebridge",
+    "homebridge-plugin",
+    "HomeKit"
+  ],
+  "license": "ISC",
+  "main": "index.js",
+  "name": "homebridge-weatherstation-airquality",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thncode/homebridge-weatherstation-airquality.git"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "version": "1.0.0"
+}
