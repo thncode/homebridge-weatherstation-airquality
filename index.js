@@ -1,4 +1,4 @@
-var Service, Characteristic, HomebridgeAPI, FakeGatoHistoryService;
+var Service, Characteristic, HomebridgeAPI, UUIDGen, FakeGatoHistoryService;
 var inherits = require('util').inherits;
 var os = require("os");
 var hostname = os.hostname();
@@ -10,15 +10,12 @@ var intervalID;
 
 const readFile = "/home/pi/WeatherStation/airquality.txt";
 
-var temperature;
+var PPM25;
+var PPM10;
 var battery;
-
-var alertLevel;
 
 var glog;
 var ctime;
-
-var lastActivation, lastReset, lastChange, timesOpened, timeOpen, timeClose;
 
 module.exports = function (homebridge) {
 	
@@ -27,15 +24,16 @@ module.exports = function (homebridge) {
     HomebridgeAPI = homebridge;
     FakeGatoHistoryService = require("fakegato-history")(homebridge);
 
-    homebridge.registerAccessory("homebridge-weatherstation-airquality", "WeatherStationAirquality", WeatherStationAirquality);
+    homebridge.registerAccessory("homebridge-weatherstation-airquality", "WeatherStationAirQuality", WeatherStationAirquality);
 };
 
 
 function read() {
 	var data = fs.readFileSync(readFile, "utf-8");
 	var lastSync = Date.parse(data.substring(0, 19));
-	temperature = parseFloat(data.substring(20));
-	battery = parseFloat(data.substring(57));
+	PPM25 = parseFloat(data.substring(20));
+	PPM10 = parseFloat(data.substring(26));
+	battery = parseFloat(data.substring(32));
 }
 
 
@@ -50,8 +48,6 @@ function WeatherStationAirquality(log, config) {
     this.config = config;
 
     this.storedData = {};
-
-	alertLevel = config['alertLevel'];
 
     this.setUpServices();
     
@@ -72,14 +68,18 @@ function WeatherStationAirquality(log, config) {
 			ctime = stats.mtime;
 			doit = true;
 		}
+		
+		// doit = true;
 			
 		if (doit) {
 			read();
-			glog("Ice Data: ", temperature, alertLevel, battery);
+			glog("Air quality data: ", PPM25, PPM10, battery);
 
 			that.fakeGatoHistoryService.addEntry({
-				time: new Date().getTime() / 1000,
-				status: temperature < alertLevel ? 1 : 0
+				time: moment().unix(),
+				temp: 0,
+				humidity: 0,
+				ppm: PPM25
 				});
 		}
 	}, 2000);
@@ -90,69 +90,47 @@ WeatherStationAirquality.prototype.getFirmwareRevision = function (callback) {
     callback(null, '1.0.0');
 };
 
+
 WeatherStationAirquality.prototype.getBatteryLevel = function (callback) {
 	var perc = (battery - 0.8) * 100;
     callback(null,perc);
 };
 
+
 WeatherStationAirquality.prototype.getStatusActive = function (callback) {
     callback(null, true);
 };
 
+
 WeatherStationAirquality.prototype.getStatusLowBattery = function (callback) {
-	if (battery >= 0.8)
-        callback(null, Characteristic.StatusLowBattery.BATTERY_LEVEL_NORMAL);
-    else
-        callback(null, Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW);
-};
-
-WeatherStationAirquality.prototype.getStatusIce = function (callback) {	
-    callback(null, temperature < alertLevel ? 
-    		 Characteristic.ContactSensorState.CONTACT_NOT_DETECTED : Characteristic.ContactSensorState.CONTACT_DETECTED);
+    callback(null, battery >= 0.8 ? Characteristic.StatusLowBattery.BATTERY_LEVEL_NORMAL : Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW);
 };
 
 
-WeatherStationAirquality.prototype.getOpenDuration = function (callback) {
-    this.iceAlertService.getCharacteristic(Characteristic.OpenDuration).updateValue(this.timeOpen, null);
-    return callback(null, this.timeOpen);
+WeatherStationAirquality.prototype.getPM2_5Density = function (callback) {	
+    callback(null, PPM25);
 };
 
 
-WeatherStationAirquality.prototype.getClosedDuration = function (callback) {
-    this.iceAlertService.getCharacteristic(Characteristic.ClosedDuration).updateValue(this.timeClose, null);
-    return callback(null, this.timeClose);
+WeatherStationAirquality.prototype.getPM10Density = function (callback) {	
+    callback(null, PPM10);
 };
 
 
-WeatherStationAirquality.prototype.gettimesOpened = function (callback) {
-    this.iceAlertService.getCharacteristic(Characteristic.TimesOpened).updateValue(this.timesOpened, null);
-    return callback(null, this.timesOpened);
+WeatherStationAirquality.prototype.getAirQuality = function (callback) {	
+//	Characteristic.AirQuality.UNKNOWN = 0;
+//	Characteristic.AirQuality.EXCELLENT = 1;
+	Characteristic.AirQuality.GOOD = 2;
+//	Characteristic.AirQuality.FAIR = 3;
+//	Characteristic.AirQuality.INFERIOR = 4;
+//	Characteristic.AirQuality.POOR = 5;
+    callback(null, 2);
 };
 
 
-WeatherStationAirquality.prototype.getLastActivation = function (callback) {
-    this.iceAlertService.getCharacteristic(Characteristic.LastActivation).updateValue(this.lastActivation, null);
-    return callback(null, this.lastActivation);
-};
-
-
-WeatherStationAirquality.prototype.getReset = function (callback) {
-    this.fakeGatoHistoryService.getCharacteristic(Characteristic.ResetTotal).updateValue(this.lastReset, null);
-    return callback(null, this.lastReset);
-};
-
-
-WeatherStationAirquality.prototype.setReset = function (value, callback) {
-	this.timesOpened = 0;
-	this.lastReset = value;
-    this.fakeGatoHistoryService.setExtraPersistedData([{"lastActivation": this.lastActivation, "lastReset": this.lastReset, 
-    			"lastChange": this.lastChange, "timesOpened": this.timesOpened, "timeOpen": this.timeOpen, "timeClose": this.timeClose}]);
-
-    if (this.iceAlertService.getCharacteristic(Characteristic.TimesOpened)) {
-        this.iceAlertService.getCharacteristic(Characteristic.TimesOpened).updateValue(this.timesOpened, null)
-    }
-    this.fakeGatoHistoryService.getCharacteristic(Characteristic.ResetTotal).updateValue(this.lastReset, null);
-    return callback();
+WeatherStationAirquality.prototype.getEveAirQuality = function (callback) {	
+	Characteristic.AirQuality.GOOD = 2;
+    callback(null, 2);
 };
 
 
@@ -162,8 +140,8 @@ WeatherStationAirquality.prototype.setUpServices = function () {
 
     this.informationService
         .setCharacteristic(Characteristic.Manufacturer, "THN Systems")
-        .setCharacteristic(Characteristic.Model, "WeatherStationAirquality")
-        .setCharacteristic(Characteristic.SerialNumber, hostname + "-" + this.name)
+        .setCharacteristic(Characteristic.Model, "WeatherStationAirQuality")
+        .setCharacteristic(Characteristic.SerialNumber, hostname + "-" + this.name + "1")
     this.informationService.getCharacteristic(Characteristic.FirmwareRevision)
         .on('get', this.getFirmwareRevision.bind(this));
         
@@ -173,116 +151,75 @@ WeatherStationAirquality.prototype.setUpServices = function () {
     this.batteryService.setCharacteristic(Characteristic.ChargingState, Characteristic.ChargingState.NOT_CHARGEABLE);
     this.batteryService.getCharacteristic(Characteristic.StatusLowBattery)
         .on('get', this.getStatusLowBattery.bind(this));
-
-    this.iceAlertService = new Service.ContactSensor("Eis", "ice");
-    this.iceAlertService.getCharacteristic(Characteristic.ContactSensorState)
-        .on('get', this.getStatusIce.bind(this));
-    this.iceAlertService.getCharacteristic(Characteristic.StatusLowBattery)
-        .on('get', this.getStatusLowBattery.bind(this));
-    this.iceAlertService.getCharacteristic(Characteristic.StatusActive)
-        .on('get', this.getStatusActive.bind(this));
-
-    this.fakeGatoHistoryService = new FakeGatoHistoryService("door", this, { storage: 'fs' });
-
-    Characteristic.OpenDuration = function() {
-    	 Characteristic.call(this, 'Time open', 'E863F118-079E-48FF-8F27-9C2605A29F52');
-         this.setProps({
-           format: Characteristic.Formats.UINT32,
-           unit: Characteristic.Units.SECONDS,
-           perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY]
-         });
-         this.value = this.getDefaultValue();
-    };
-    inherits(Characteristic.OpenDuration, Characteristic);
-    Characteristic.OpenDuration.UUID = 'E863F118-079E-48FF-8F27-9C2605A29F52';  
-
-    Characteristic.ClosedDuration = function() {
-    	 Characteristic.call(this, 'Time closed', 'E863F119-079E-48FF-8F27-9C2605A29F52');
-         this.setProps({
-           format: Characteristic.Formats.UINT32,
-           unit: Characteristic.Units.SECONDS,
-           perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY]
-         });
-         this.value = this.getDefaultValue();
-    };
-    inherits(Characteristic.ClosedDuration, Characteristic);
-    Characteristic.ClosedDuration.UUID = 'E863F119-079E-48FF-8F27-9C2605A29F52';  
-    
-    Characteristic.LastActivation = function() {
-    	 Characteristic.call(this, 'Last Activation', 'E863F11A-079E-48FF-8F27-9C2605A29F52');
-         this.setProps({
-           format: Characteristic.Formats.UINT32,
-           unit: Characteristic.Units.SECONDS,
-           perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY]
-         });
-         this.value = this.getDefaultValue();
-    };
-    inherits(Characteristic.LastActivation, Characteristic);
-    Characteristic.LastActivation.UUID = 'E863F11A-079E-48FF-8F27-9C2605A29F52';  
-
-    Characteristic.TimesOpened = function() {
-    	 Characteristic.call(this, 'times opened', 'E863F129-079E-48FF-8F27-9C2605A29F52');
-         this.setProps({
-           format: Characteristic.Formats.UINT32,
-           //unit: Characteristic.Units.SECONDS,
-           perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY]
-         });
-         this.value = this.getDefaultValue();
-    };
-    inherits(Characteristic.TimesOpened, Characteristic);
-    Characteristic.TimesOpened.UUID = 'E863F129-079E-48FF-8F27-9C2605A29F52';  
-
-    Characteristic.ResetTotal = function() {
-    	 Characteristic.call(this, 'times opened', 'E863F112-079E-48FF-8F27-9C2605A29F52');
-         this.setProps({
-           format: Characteristic.Formats.UINT32,
-           //unit: Characteristic.Units.SECONDS,
-           perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY]
-         });
-         this.value = this.getDefaultValue();
-    };
-    inherits(Characteristic.ResetTotal, Characteristic);
-    Characteristic.ResetTotal.UUID = 'E863F112-079E-48FF-8F27-9C2605A29F52';  
-    
-    this.iceAlertService.addCharacteristic(Characteristic.LastActivation)
-        .on('get', this.getLastActivation.bind(this));
-    this.iceAlertService.addCharacteristic(Characteristic.TimesOpened)
-        .on('get', this.gettimesOpened.bind(this));
-    this.iceAlertService.addCharacteristic(Characteristic.OpenDuration)
-        .on('get', this.getOpenDuration.bind(this));
-    this.iceAlertService.addCharacteristic(Characteristic.ClosedDuration)
-        .on('get', this.getClosedDuration.bind(this));
-    this.iceAlertService.addCharacteristic(Characteristic.ResetTotal)
-        .on('get', this.getReset.bind(this))
-        .on('set', this.setReset.bind(this));
         
-    if (this.fakeGatoHistoryService.getExtraPersistedData() == undefined) {
-    	this.lastActivation = 0;
-    	this.lastReset = moment().unix() - moment('2001-01-01T00:00:00Z').unix();
-    	this.lastChange = moment().unix();
-    	this.timeOpened = 0;
-    	this.timeOpen = 0;
-    	this.timeClose = 0;
-           
-        this.fakeGatoHistoryService.setExtraPersistedData([{"lastActivation": this.lastActivation, "lastReset": this.lastReset, 
-        				"lastChange": this.lastChange, "timesOpened": this.timesOpened, "timeOpen": this.timeOpen, "timeClose": this.timeClose}]);
+    this.fakeGatoHistoryService = new FakeGatoHistoryService("room", this, { storage: 'fs' });
 
-        } else {
-            this.lastActivation = this.fakeGatoHistoryService.getExtraPersistedData()[0].lastActivation;
-            this.lastReset = this.fakeGatoHistoryService.getExtraPersistedData()[0].lastReset;
-            this.lastChange = this.fakeGatoHistoryService.getExtraPersistedData()[0].lastChange;
-            this.timesOpened = this.fakeGatoHistoryService.getExtraPersistedData()[0].timesOpened;
-            this.timeOpen = this.fakeGatoHistoryService.getExtraPersistedData()[0].timeOpen;
-            this.timeClose = this.fakeGatoHistoryService.getExtraPersistedData()[0].timeClose;
-        }
-        
     var CustomCharacteristic = {};
     
+    CustomCharacteristic.AirQuality = function () {
+		Characteristic.call(this, 'Air Quality PM25', 'E863F10B-079E-48FF-8F27-9C2605A29F52');
+        this.setProps({
+            format: Characteristic.Formats.UINT16,
+            unit: "ppm",
+            maxValue: 99999,
+            minValue: 2,
+            minStep: 1,
+            perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY]
+        });
+        this.value = this.getDefaultValue();
+    };
+    CustomCharacteristic.AirQuality.uuid = 'E863F10B-079E-48FF-8F27-9C2605A29F52';
+    inherits(CustomCharacteristic.AirQuality, Characteristic);
+
+    CustomCharacteristic.EveAirQuality = function () {
+		Characteristic.call(this, 'Eve Air Quality', 'E863F11B-079E-48FF-8F27-9C2605A29F52');
+        this.setProps({
+            format: Characteristic.Formats.FLOAT,
+            unit: "ppm",
+            maxValue: 5000,
+            minValue: 0,
+            minStep: 1,
+            perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY]
+        });
+        this.value = this.getDefaultValue();
+    };
+    CustomCharacteristic.EveAirQuality.UUID = 'E863F11B-079E-48FF-8F27-9C2605A29F52';
+    inherits(CustomCharacteristic.EveAirQuality, Characteristic);
+    	    
+    // AirQuality sensor
+    airQualitySensor = function (displayName, subtype) {
+    let uuid = UUIDGen.generate('airQualitySensor');
+    Service.call(this, displayName, uuid, subtype);
+
+        this.addCharacteristic(Characteristic.AirQuality);
+        this.addCharacteristic(CustomCharacteristic.EveAirQuality);
+    };
+    inherits(airQualitySensor, Service);
+    //airQualitySensor.UUID = uuid;
+
+
+    this.airQualityService = new Service.AirQualitySensor('Luftqualität');
+
+	this.airQualityService
+	.setCharacteristic(Characteristic.AirParticulateSize, '2.5um');
+			    
+    this.airQualityService.getCharacteristic(Characteristic.AirQuality)
+	.on('get', this.getAirQuality.bind(this));
+    this.airQualityService.getCharacteristic(CustomCharacteristic.EveAirQuality)
+	.on('get', this.getEveAirQuality.bind(this));
+    this.airQualityService.getCharacteristic(Characteristic.PM2_5Density)
+	.on('get', this.getPM2_5Density.bind(this));
+    this.airQualityService.getCharacteristic(Characteristic.PM10Density)
+	.on('get', this.getPM10Density.bind(this));
+    this.airQualityService.getCharacteristic(Characteristic.StatusLowBattery)
+    .on('get', this.getStatusLowBattery.bind(this));
+    this.airQualityService.getCharacteristic(Characteristic.StatusActive)
+    .on('get', this.getStatusActive.bind(this));
 };
 
 
 WeatherStationAirquality.prototype.getServices = function () {
-    var services = [this.informationService, this.batteryService, this.fakeGatoHistoryService, this.iceAlertService];
+    var services = [this.informationService, this.batteryService, this.fakeGatoHistoryService, this.airQualityService];
 
     return services;
 };
