@@ -5,9 +5,6 @@ var hostname = os.hostname();
 const fs = require('fs');
 const moment = require('moment');
 
-
-var intervalID;
-
 const readFile = "/home/pi/WeatherStation/airquality.txt";
 
 var PPM25, PPM10, battery, readtime;
@@ -31,14 +28,13 @@ function WeatherStationAirquality(log, config) {
     this.name = config.name;
     this.displayName = this.name;
     this.deviceId = config.deviceId;
-    this.interval = Math.min(Math.max(config.interval, 1), 60);
 
     this.config = config;
 
     this.storedData = {};
 
     this.setUpServices();
-    
+
     this.readData();
     
    	fs.watch(readFile, (event, filename) => {
