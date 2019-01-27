@@ -5,7 +5,7 @@ var hostname = os.hostname();
 const fs = require('fs');
 const moment = require('moment');
 
-const readFile = "/home/pi/WeatherStation/airquality.txt";
+const readFile = "/root/.homebridge/airquality.txt";
 
 var PPM25, PPM10, battery, readtime;
 
