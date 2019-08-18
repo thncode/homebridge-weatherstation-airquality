@@ -1,3 +1,5 @@
+// missing: weatherstation-airquality missing?!?
+
 var Service, Characteristic, HomebridgeAPI, UUIDGen, FakeGatoHistoryService;
 var inherits = require('util').inherits;
 var os = require("os");
